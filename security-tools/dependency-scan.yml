@@ -1,0 +1,94 @@
+# ═══════════════════════════════════════════════════════════
+#  dependency-scan.yml — Configuration du scan des dépendances
+# ═══════════════════════════════════════════════════════════
+
+# Politique de scan des dépendances pour l'Agent DevSecOps
+
+scan:
+  # Outils activés
+  tools:
+    - name: npm-audit
+      enabled: true
+      config:
+        # Niveau de sévérité minimum pour bloquer le pipeline
+        audit_level: critical  # none | low | moderate | high | critical
+        production_only: true  # Ignore les devDependencies
+        fix_auto: false        # Ne pas appliquer les fixes automatiquement
+
+    - name: osv-scanner
+      enabled: true
+      config:
+        # Open Source Vulnerabilities Scanner (Google)
+        format: json
+        output: osv-report.json
+
+    - name: snyk
+      enabled: false  # Activer si licence Snyk disponible
+      config:
+        fail_on: high
+        monitor: true
+
+  # Registres à scanner
+  registries:
+    - npm
+    - yarn
+
+  # Exclusions (packages légitimement vulnérables ou faux positifs)
+  exclusions:
+    packages: []
+    cves: []
+
+# Politique de conformité
+policy:
+  # Bloquer le pipeline si vulnérabilités critiques détectées
+  block_on_critical: true
+
+  # Nombre maximum de vulnérabilités élevées tolérées
+  max_high_vulns: 5
+
+  # Âge maximum des dépendances (en jours) avant alerte
+  max_package_age_days: 730  # 2 ans
+
+  # Licences interdites
+  forbidden_licenses:
+    - GPL-3.0
+    - AGPL-3.0
+    - LGPL-3.0
+    - CC-BY-NC-4.0
+
+  # Licences autorisées
+  allowed_licenses:
+    - MIT
+    - Apache-2.0
+    - BSD-2-Clause
+    - BSD-3-Clause
+    - ISC
+    - CC0-1.0
+    - Unlicense
+
+# Notifications
+notifications:
+  # Notifier via Telegram si nouvelles vulnérabilités critiques
+  telegram:
+    enabled: true
+    on_critical: true
+    on_high: false
+
+  # Créer automatiquement des issues GitLab
+  gitlab_issues:
+    enabled: true
+    labels:
+      - security
+      - dependencies
+    assignee: ""  # Laisser vide pour non assigné
+
+# Exemples de fichiers lock supportés
+lock_files:
+  - package-lock.json
+  - yarn.lock
+  - pnpm-lock.yaml
+  - requirements.txt
+  - Pipfile.lock
+  - Gemfile.lock
+  - go.sum
+  - Cargo.lock

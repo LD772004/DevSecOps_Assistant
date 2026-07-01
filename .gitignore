@@ -1,0 +1,10 @@
+node_modules/
+.env
+*.log
+dist/
+coverage/
+*.json.report
+trivy-report.json
+gitleaks-report.json
+npm-audit-report.json
+gl-*.json

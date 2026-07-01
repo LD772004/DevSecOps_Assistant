@@ -1,0 +1,163 @@
+version: '3.9'
+
+# ═══════════════════════════════════════════════════════════
+#  docker-compose.yml — Stack DevSecOps Agent
+#  Services: telegram-bot, agent-ia, redis, prometheus, grafana
+# ═══════════════════════════════════════════════════════════
+
+networks:
+  devsecops:
+    driver: bridge
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  logs_data:
+
+services:
+
+  # ─────────────────────────────────────────────
+  #  Bot Telegram
+  # ─────────────────────────────────────────────
+  telegram-bot:
+    build:
+      context: ../telegram-bot
+      dockerfile: Dockerfile
+    image: devsecops/telegram-bot:latest
+    container_name: telegram-bot
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ENV=production
+      - AGENT_URL=http://agent-ia:3000
+    depends_on:
+      agent-ia:
+        condition: service_healthy
+    networks:
+      - devsecops
+    volumes:
+      - logs_data:/var/log
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────────────────────────────────────
+  #  Agent IA (API Express + Claude)
+  # ─────────────────────────────────────────────
+  agent-ia:
+    build:
+      context: ../agent-ia
+      dockerfile: Dockerfile
+    image: devsecops/agent-ia:latest
+    container_name: agent-ia
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - devsecops
+    volumes:
+      - logs_data:/var/log
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  # ─────────────────────────────────────────────
+  #  Redis (cache + rate limiting)
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: devsecops-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - devsecops
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ─────────────────────────────────────────────
+  #  Prometheus (métriques)
+  # ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: devsecops-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - devsecops
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ─────────────────────────────────────────────
+  #  Grafana (dashboard)
+  # ─────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: devsecops-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - devsecops
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"

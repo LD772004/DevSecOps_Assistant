@@ -1,0 +1,84 @@
+# ═══════════════════════════════════════════════════════════
+#  docker-scan.yml — Configuration du scan Docker (Trivy)
+# ═══════════════════════════════════════════════════════════
+
+# Configuration Trivy pour le scan des images Docker
+# https://aquasecurity.github.io/trivy/
+
+trivy:
+  # Sévérités à rapporter
+  severity:
+    - CRITICAL
+    - HIGH
+    - MEDIUM
+    - LOW
+
+  # Sévérités qui font échouer le pipeline
+  fail_on:
+    - CRITICAL
+    - HIGH
+
+  # Options de scan
+  options:
+    ignore_unfixed: true      # Ignorer les CVE sans correctif disponible
+    skip_update: false        # Mettre à jour la DB de vulnérabilités
+    timeout: 5m               # Timeout du scan
+    light: false              # Scan complet (pas le mode light)
+    no_progress: true         # Pas de barre de progression en CI
+
+  # Formats de sortie
+  output:
+    format: json              # json | table | sarif | cyclonedx
+    file: trivy-report.json
+    sarif_file: gl-container-scanning-report.json  # Format GitLab
+
+  # Cache Trivy (accélère les scans suivants)
+  cache:
+    backend: fs
+    dir: /tmp/.cache/trivy
+
+  # Couches à ignorer
+  skip_dirs:
+    - /proc
+    - /sys
+
+  # Ignorer des CVE spécifiques (avec justification obligatoire)
+  ignored_cves: []
+  # Exemple:
+  # - id: CVE-2021-44228
+  #   reason: "Vulnérabilité Log4Shell - notre image n'utilise pas Java"
+  #   expiry: "2024-12-31"
+
+# Bonnes pratiques Dockerfile (vérifiées par Dockle ou Hadolint)
+dockerfile_checks:
+  # Règles Hadolint
+  hadolint:
+    enabled: true
+    ignore:
+      - DL3008  # apt-get sans version épinglée
+      - DL3009  # Cache apt-get (acceptable en multi-stage)
+    fail_on: error  # error | warning | info | style
+
+  # Règles Dockle (CIS Benchmark)
+  dockle:
+    enabled: false
+    fail_on: fatal
+
+# Images de base autorisées
+allowed_base_images:
+  - "node:*-alpine"
+  - "node:*-slim"
+  - "alpine:*"
+  - "python:*-slim"
+  - "nginx:*-alpine"
+
+# Images de base interdites (trop volumineuses ou non maintenues)
+forbidden_base_images:
+  - "node:latest"
+  - "ubuntu:16.04"
+  - "debian:jessie"
+
+# Politique de taille des images
+image_size_policy:
+  max_size_mb: 500
+  warn_size_mb: 250
