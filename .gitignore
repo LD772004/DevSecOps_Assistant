@@ -8,3 +8,6 @@ trivy-report.json
 gitleaks-report.json
 npm-audit-report.json
 gl-*.json
+telegram-bot/.env
+agent-ia\.env
+*.env

@@ -1,8 +1,4 @@
-# 🤖 Agent DevSecOps — Piloté via Telegram
 
-> Pipeline CI/CD complet contrôlé depuis Telegram, avec IA intégrée (Claude), scans de sécurité automatisés et notifications en temps réel.
-
----
 
 ## Architecture
 
@@ -134,3 +130,5 @@ docker compose -f deployment/docker-compose.yml up -d
 ```
 
 Voir [docs/INSTALL.md](docs/INSTALL.md) pour le guide complet.
+
+# DevSecOps_Assistant
