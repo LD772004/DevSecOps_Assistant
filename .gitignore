@@ -11,3 +11,4 @@ gl-*.json
 telegram-bot/.env
 agent-ia\.env
 *.env
+*.env.example
